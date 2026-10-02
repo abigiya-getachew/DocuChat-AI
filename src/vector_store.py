@@ -2,7 +2,8 @@ import chromadb
 from config import Config
 
 client = chromadb.PersistentClient(path=Config.CHROMA_PATH)
-collection = client.get_or_create_collection(name="docuchat_docs")
+_coll_name = f"docuchat_{Config.EMBEDDING_MODEL.replace('-', '_').replace('/', '_')}"
+collection = client.get_or_create_collection(name=_coll_name)
 
 def add_documents(embedded_chunks, batch_size=100):
     for i in range(0, len(embedded_chunks), batch_size):

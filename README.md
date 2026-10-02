@@ -155,6 +155,40 @@ This will:
 
 ---
 
+## 🚀 Deploy on Render (100% Free Tier)
+
+Render's free tier provides 512MB RAM, which cannot run local Ollama. We configured DocuChat AI to run seamlessly on Render using **in-process embeddings** (`sentence-transformers/all-MiniLM-L6-v2`) and the free **Groq Cloud API** for ultra-fast Llama 3 answers.
+
+### Step 1: Get a Free Groq API Key
+1. Go to [https://console.groq.com/keys](https://console.groq.com/keys)
+2. Sign up and click **Create API Key** (completely free, no credit card required)
+
+### Step 2: Push Your Code to GitHub
+```bash
+git add .
+git commit -m "chore: prepare for Render deployment"
+git push origin main
+```
+
+### Step 3: Deploy on Render
+1. Go to [Render Dashboard](https://dashboard.render.com/) and click **New +** → **Web Service**
+2. Connect your **DocuChat_AI** repository
+3. Configure settings:
+   - **Name**: `docuchat-ai`
+   - **Environment**: `Python 3`
+   - **Region**: Any (e.g. Frankfurt or Oregon)
+   - **Branch**: `main`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn --bind 0.0.0.0:$PORT web_app:app`
+   - **Instance Type**: **Free** ($0/month)
+4. Add **Environment Variables** in the Environment tab:
+   - `GROQ_API_KEY` = `your_groq_api_key_here`
+   - `DEFAULT_MODEL` = `llama-3.3-70b-versatile`
+   - `PYTHON_VERSION` = `3.11.9`
+5. Click **Create Web Service**! Render will build and deploy your app.
+
+---
+
 ## Multi-Document Support
 
 DocuChat AI supports **multiple documents simultaneously**.

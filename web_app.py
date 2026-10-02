@@ -24,27 +24,33 @@ def get_chunk_count():
 
 def get_uploaded_documents():
     docs = []
-    if os.path.exists(Config.DATA_FOLDER):
-        for f in os.listdir(Config.DATA_FOLDER):
-            if f.lower().endswith('.pdf'):
-                path = os.path.join(Config.DATA_FOLDER, f)
+    try:
+        data = collection.get(include=["metadatas"])
+        source_counts = {}
+        if data and data.get("metadatas"):
+            for meta in data["metadatas"]:
+                if meta and "source" in meta:
+                    src = meta["source"]
+                    source_counts[src] = source_counts.get(src, 0) + 1
+
+        for filename, doc_chunks in sorted(source_counts.items()):
+            path = os.path.join(Config.DATA_FOLDER, filename)
+            size_str = "N/A"
+            if os.path.exists(path):
                 try:
                     size_bytes = os.path.getsize(path)
                     size_mb = size_bytes / (1024 * 1024)
                     size_str = f"{size_mb:.1f} MB" if size_mb >= 1 else f"{size_bytes / 1024:.0f} KB"
-                    try:
-                        chunk_items = collection.get(where={"source": f})
-                        doc_chunks = len(chunk_items["ids"]) if chunk_items and "ids" in chunk_items else 0
-                    except Exception:
-                        doc_chunks = 0
-                    docs.append({
-                        "name": f,
-                        "size": size_str,
-                        "chunks": doc_chunks,
-                        "indexed": doc_chunks > 0
-                    })
                 except Exception:
-                    docs.append({"name": f, "size": "Unknown", "chunks": 0, "indexed": False})
+                    pass
+            docs.append({
+                "name": filename,
+                "size": size_str,
+                "chunks": doc_chunks,
+                "indexed": True
+            })
+    except Exception as e:
+        print(f"Error querying active documents: {e}")
     return docs
 
 
@@ -1146,7 +1152,7 @@ HTML_TEMPLATE = """
                                 {% else %}
                                 <span class="doc-status-badge" style="background: rgba(245, 158, 11, 0.12); color: #D97706;">Pending</span>
                                 {% endif %}
-                                <button class="btn-delete-doc" onclick="removeDocument('{{ doc.name }}', event)" title="Delete document & chunks">
+                                <button class="btn-delete-doc" onclick="removeDocument('{{ doc.name }}', event)" title="Remove from workspace (local file is kept safe)">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="3 6 5 6 21 6"></polyline>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1454,7 +1460,7 @@ HTML_TEMPLATE = """
                         <span class="doc-status-badge" style="${d.indexed ? '' : 'background:rgba(245,158,11,0.12);color:#D97706;'}">
                             ${d.indexed ? 'Indexed' : 'Pending'}
                         </span>
-                        <button class="btn-delete-doc" onclick="removeDocument('${d.name}', event)" title="Delete document & chunks">
+                        <button class="btn-delete-doc" onclick="removeDocument('${d.name}', event)" title="Remove from workspace (local file is kept safe)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1467,7 +1473,7 @@ HTML_TEMPLATE = """
 
         async function removeDocument(filename, e) {
             if (e) e.stopPropagation();
-            if (!confirm(`Are you sure you want to remove "${filename}" and delete its vector chunks from ChromaDB?`)) {
+            if (!confirm(`Remove "${filename}" from the AI workspace? This will remove its vectors from search, but your original file will remain safe in your folder.`)) {
                 return;
             }
             try {
@@ -1771,23 +1777,15 @@ def delete_document():
     if not filename:
         return jsonify({"success": False, "error": "Filename is required"}), 400
 
-    # Remove from ChromaDB vector store
+    # Remove only from ChromaDB vector store (local file is preserved on disk)
     remove_documents_by_source(filename)
-
-    # Remove from uploaded documents folder
-    file_path = os.path.join(Config.DATA_FOLDER, filename)
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            print(f"Error deleting file {file_path}: {e}")
 
     total_chunks = get_chunk_count()
     docs = get_uploaded_documents()
 
     return jsonify({
         "success": True,
-        "message": f"Successfully deleted {filename} and removed its vector chunks.",
+        "message": f"Removed '{filename}' from workspace index. Local file remains safe in your folder.",
         "total_chunks": total_chunks,
         "documents": docs
     })
