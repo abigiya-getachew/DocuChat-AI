@@ -1,2 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
 .env
-.venv
+data/uploaded_docs/*
+!data/uploaded_docs/.gitkeep
+outputs/
+chroma_db/
+*.log
+.vscode/
