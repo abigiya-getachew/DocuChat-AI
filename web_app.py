@@ -1313,16 +1313,33 @@ HTML_TEMPLATE = """
         // Formatting helper for citations and markdown
         function formatAIResponse(text) {
             if (!text) return '';
-            
-            // Format [Source: filename, Page X]
-            let formatted = text.replace(/\\[Source:\\s*([^,\\]]+),\\s*Page\\s*(\\d+)\\]/gi, function(match, src, page) {
+
+            let formatted = escapeHtml(text);
+
+            // Format [Source: filename, Page X] and (Source: filename, Page X)
+            formatted = formatted.replace(/(?:\\[|\\()Source:\\s*([^,)\\]]+),\\s*Page\\s*(\\d+)(?:\\]|\\))/gi, function(match, src, page) {
                 return `<div class="citation-tag">📄 <strong>${src}</strong> • Page ${page}</div>`;
             });
 
-            // Format simple markdown bold and code
-            formatted = formatted.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
+            // Convert markdown headings to styled spans (prevents huge browser heading rendering)
+            formatted = formatted.replace(/^#{6}\s+(.*)$/gm, '<span style="font-weight:600;font-size:13px;color:var(--text-primary);">$1</span>');
+            formatted = formatted.replace(/^#{5}\s+(.*)$/gm, '<span style="font-weight:600;font-size:13px;color:var(--text-primary);">$1</span>');
+            formatted = formatted.replace(/^#{4}\s+(.*)$/gm, '<span style="font-weight:600;font-size:14px;color:var(--text-primary);">$1</span>');
+            formatted = formatted.replace(/^#{3}\s+(.*)$/gm, '<span style="font-weight:700;font-size:14px;color:var(--accent-primary);">$1</span>');
+            formatted = formatted.replace(/^#{2}\s+(.*)$/gm, '<span style="font-weight:700;font-size:15px;color:var(--accent-primary);">$1</span>');
+            formatted = formatted.replace(/^#\s+(.*)$/gm, '<span style="font-weight:700;font-size:15px;color:var(--accent-primary);">$1</span>');
+
+            // Format bold/italic
+            formatted = formatted.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+            // Format inline code
             formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:rgba(37,99,235,0.08);color:var(--accent-secondary);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;">$1</code>');
-            
+
+            // Format bullet points
+            formatted = formatted.replace(/^\s*[\*\-]\s+(.*)$/gm, '<span style="display:block;padding-left:14px;">• $1</span>');
+
             // Format line breaks
             formatted = formatted.replace(/\\n/g, '<br>');
             return formatted;
@@ -1595,11 +1612,16 @@ HTML_TEMPLATE = """
             }
         }
 
-        // Suggestions
+        // Suggestions — fill input and auto-submit
         function useSuggestion(text) {
             const input = document.getElementById('question-input');
             input.value = text;
             input.focus();
+            // Auto-submit after a brief delay so user sees what was typed
+            setTimeout(() => {
+                const form = document.getElementById('ask-form');
+                form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }, 120);
         }
 
         // Copy Text
@@ -1619,16 +1641,27 @@ HTML_TEMPLATE = """
 
         // Clear Chat
         function clearChat() {
+            if (!confirm('Clear this conversation?')) return;
             const messages = document.getElementById('chat-messages');
             messages.innerHTML = `
                 <div class="chat-empty" id="chat-empty">
                     <div class="empty-icon">✨</div>
                     <h3 class="empty-title">Ask anything from your documents</h3>
-                    <p class="empty-desc">
-                        DocuChat AI queries your Chroma vector store, retrieves high-relevance chunks, and generates precise answers with exact page citations.
-                    </p>
+                    <p class="empty-desc">DocuChat AI retrieves high-relevance chunks and generates precise answers with exact page citations.</p>
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%;max-width:380px;">
+                        <div class="suggestion-pill" onclick="useSuggestion('Summarize the primary purpose and key points of this document.')">
+                            <span>📌</span> Summarize the key points
+                        </div>
+                        <div class="suggestion-pill" onclick="useSuggestion('What are the core technical concepts explained in the text?')">
+                            <span>🔍</span> Core technical concepts
+                        </div>
+                        <div class="suggestion-pill" onclick="useSuggestion('List any prerequisites, requirements, or steps mentioned.')">
+                            <span>📋</span> List requirements &amp; steps
+                        </div>
+                    </div>
                 </div>
             `;
+            showToast('Chat cleared', 'success');
         }
 
         function escapeHtml(string) {
