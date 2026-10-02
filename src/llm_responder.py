@@ -1,4 +1,4 @@
-import ollama
+import requests
 from config import Config
 from embedding_engine import get_embedding
 from vector_store import search_relevant
@@ -26,8 +26,13 @@ If answer is not in context, say "I cannot find that information in the provided
 {user_question}
 """
 
-    response = ollama.chat(
-        model=Config.DEFAULT_MODEL,
-        messages=[{"role": "user", "content": prompt}]
+    response = requests.post(
+        f"{Config.OLLAMA_HOST}/api/chat",
+        headers={"Authorization": f"Bearer {Config.OLLAMA_API_KEY}"},
+        json={
+            "model": Config.DEFAULT_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False
+        }
     )
-    return response["message"]["content"]
+    return response.json()["message"]["content"]

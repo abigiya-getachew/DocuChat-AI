@@ -1,5 +1,6 @@
 ollama>=0.4.0
-python-dotenv
+flask
 pypdf
 chromadb
 sentence-transformers
+python-dotenv
